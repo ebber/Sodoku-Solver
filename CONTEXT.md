@@ -515,8 +515,12 @@ curl -X POST http://localhost:8000/api/new-puzzle \
 ```bash
 git status
 git log --oneline
+
+# Push to GitHub (should work normally now - remote is fixed)
 git push origin main
 ```
+
+**Note:** Git remote was temporarily changed to HTTPS during debugging but has been restored to original SSH format: `git@github.com:ebber/Sodoku-Solver.git`
 
 ---
 

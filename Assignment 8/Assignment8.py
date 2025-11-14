@@ -109,7 +109,22 @@ class Board:
         Returns:
             a tuple of row, column index identifying the most constrained cell
         """
-        pass
+        shortest_cell_size = 9 #max is 9 numbers possible
+        shortest_cell_coords = None
+        for r in range(self.size):
+            for c in range(self.size):
+                if isinstance(self.rows[r][c], list) and len(self.rows[r][c]) < shortest_cell_size: #check if the cell is a list
+                    shortest_cell_size = len(self.rows[r][c])
+                    shortest_cell_coords = (r, c)
+
+                    #special case, if the cell only has one possible number, we return it immediately (there can be nothing shorter)
+                    #this doesn't change the big O, just an optimization
+                    if shortest_cell_size == 1:
+                        return shortest_cell_coords
+        #return the coordinates of the shortest cell
+        return shortest_cell_coords
+
+        return None
 
     def failure_test(self) -> bool:
         """Check if we've failed to correctly fill out the puzzle. If we find a cell
@@ -119,7 +134,12 @@ class Board:
         Returns:
             True if we have failed to fill out the puzzle, False otherwise
         """
-        pass
+        #we check if any cell contains an empty list, if so, we have failed
+        for row in self.rows:
+            for cell in row:
+                if cell == []:
+                    return True
+        return False
 
 
     def goal_test(self) -> bool:
@@ -129,8 +149,9 @@ class Board:
         Returns:
             True if we've placed all numbers, False otherwise
         """
-        pass
-
+        #for a standard 9x9 sudoku board, we have 81 cells, so we check if we have placed all 81 numbers
+        return self.num_nums_placed == self.size * self.size
+    
     def update(self, row: int, column: int, assignment: int) -> None:
         """Assigns the given value to the cell given by passed in row and column
         coordinates. By assigning we mean set the cell to the value so instead the cell
@@ -143,7 +164,61 @@ class Board:
             column - index of the column to assign
             assignment - value to place at given row, column coordinate
         """
-        pass
+        #we update the cell at the given row and column to the given assignment
+        self.rows[row][column] = assignment
+        #update the potential on the rest of the board
+        #update the potential in the row
+        for i in range(len(self.rows)):
+            remove_if_exists(self.rows[i][column], assignment)
+
+        #update the potential in the column
+        for j in range(self.size):
+            remove_if_exists(self.rows[row][j], assignment)
+
+        #update the potential in the subgrid
+        subgrid_coords = self.subgrid_coordinates(row, column)
+        for coord in subgrid_coords:
+            remove_if_exists(self.rows[coord[0]][coord[1]], assignment)
+
+        #increment the number of numbers placed
+        self.num_nums_placed += 1
+
+def generic_search(state:Board, container:Stack or Queue) -> Board:
+    """Performs a generic search. Takes a Board and a container (stack or queue) and attempts to assign values to most constrained cells until a solution is reached or a mistake has been made at which point it backtracks.
+    Args:
+        state - an instance of the Board class to solve, need to find most constrained cell and attempt an assignment
+        container - a stack or queue to store the states
+    Returns:
+        either None in the case of invalid input
+        returns the solved board if we win
+    """
+    #Then, push the initial state onto the stack
+    container.push(state)
+    #for each state on the stack, pop it off, check if we have won
+    while not container.is_empty():
+        current_state = container.pop()
+        #we test win or fail when we add the state to the stack, so no need to do it here
+        most_constrained_cell = current_state.find_most_constrained_cell() #a tuple
+        #add states of all possible moves
+        for number in current_state.rows[most_constrained_cell[0]][most_constrained_cell[1]]:
+            new_state = copy.deepcopy(current_state)
+            #optimization - check if we have been here before with this number, if so, skip it
+            new_state.update(most_constrained_cell[0], most_constrained_cell[1], number)
+            #check if it's a failure, if so, skip it
+            #check if it's a win, if so, return it
+            if new_state.goal_test():
+                state = new_state
+                print("we won!")
+                return state
+
+            if new_state.failure_test():
+                continue
+            else:
+                #push the new state onto the stack
+                container.push(new_state)
+    
+    #if container is empty without us winning, return None - we have no solution
+    return None
 
 
 def DFS(state: Board) -> Board:
@@ -156,10 +231,11 @@ def DFS(state: Board) -> Board:
             cell and attempt an assignment
 
     Returns:
-        either None in the case of invalid input or a solved board
+        either None in the case of invalid input
+        returns the solved board if we win
     """
-    pass
 
+    return generic_search(state, Stack())
 
 def BFS(state: Board) -> Board:
     """Performs a breadth first search. Takes a Board and attempts to assign
@@ -173,7 +249,7 @@ def BFS(state: Board) -> Board:
     Returns:
         either None in the case of invalid input or a solved board
     """
-    pass
+    return generic_search(state, Stack())
 
 #setting up a sudoku puzzle for testing
 first_puzzle = [
@@ -279,6 +355,7 @@ if __name__ == "__main__":
     myb.rows[6][5] = [2,3]
     myb.rows[4][3] = 5
     assert myb.find_most_constrained_cell() == (6,5), "find most constrained test 3"
+    print("find most constrained test suite passed")
     
 
     myb = Board()
@@ -299,6 +376,7 @@ if __name__ == "__main__":
     myb.rows[4][3] = 5
     myb.rows[6][5] = []
     assert myb.failure_test() == True, "failure test test 2"
+    print("failure test test suite passed")
 
     myb = Board()
     myb.rows[7][5] = [2,4,6,7]
@@ -319,6 +397,7 @@ if __name__ == "__main__":
     myb.rows[4][3] = 5
     myb.num_nums_placed = 81
     assert myb.goal_test() == True, "goal test test 2"
+    print("goal test test suite passed")
 
     myb = Board()
     myb.rows[7][5] = [2,4,6,7]
@@ -374,6 +453,9 @@ if __name__ == "__main__":
     myb.num_nums_placed = 1
     myb.update(0, 0, 3)
     assert 3 not in myb.rows[2][2], "update test 5"
+    print("update test suite passed")
+
+    print("all function test suites passed")
 
     assert isinstance(driver_test_dfs_or_bfs(True, first_puzzle), Board), "DFS test 1"
 
